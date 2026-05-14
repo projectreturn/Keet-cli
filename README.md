@@ -84,7 +84,17 @@ This avoids live-storage lock conflicts between separate `watch` and `send` proc
 node src/cli.js bridge
 ```
 
-The bridge watches the configured Keet chat, forwards incoming messages to OpenClaw, and sends OpenClaw's reply back to Keet.
+The bridge watches the configured Keet chat, forwards incoming messages to OpenClaw or the configured local Ollama model, and sends the reply back to Keet.
+
+Model switch commands inside the Keet chat:
+
+```text
+lokal
+online
+modell status
+```
+
+`lokal` uses `qwen2.5:3b-instruct` through Ollama. `online` uses OpenClaw's normal agent path.
 
 For non-systemd environments, run it under the lightweight supervisor:
 

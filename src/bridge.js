@@ -17,12 +17,48 @@ function ensureDir (file) {
 }
 
 function loadState (file) {
-  try { return JSON.parse(fs.readFileSync(file, 'utf8')) } catch { return { processed: [] } }
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')) } catch { return { processed: [], modelMode: 'online' } }
 }
 
 function saveState (file, state) {
   ensureDir(file)
-  fs.writeFileSync(file, JSON.stringify({ ...state, processed: state.processed.slice(-500) }, null, 2))
+  fs.writeFileSync(file, JSON.stringify({ ...state, modelMode: state.modelMode || 'online', processed: state.processed.slice(-500) }, null, 2))
+}
+
+function normalizeModelMode (value) {
+  return value === 'local' ? 'local' : 'online'
+}
+
+function parseBridgeCommand (text) {
+  const normalized = text.trim().toLowerCase()
+  const compact = normalized.replace(/^\//, '').replace(/^!/, '')
+  if (['modell lokal', 'model lokal', 'lokal', 'local', 'ki lokal'].includes(compact)) return { type: 'model', mode: 'local' }
+  if (['modell online', 'model online', 'online', 'cloud', 'ki online'].includes(compact)) return { type: 'model', mode: 'online' }
+  if (['modell status', 'model status', 'status modell', 'ki status'].includes(compact)) return { type: 'status' }
+  return null
+}
+
+function runLocalOllama ({ message, timeout = 120000, model = 'qwen2.5:3b-instruct' }) {
+  return new Promise((resolve, reject) => {
+    const child = spawn('ollama', ['run', model, message], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, TERM: 'dumb', NO_COLOR: '1' } })
+    let stdout = ''
+    let stderr = ''
+    const timer = setTimeout(() => {
+      child.kill('SIGTERM')
+      reject(new Error('Ollama timed out'))
+    }, timeout)
+    child.stdout.on('data', d => { stdout += String(d) })
+    child.stderr.on('data', d => { stderr += String(d) })
+    child.on('error', err => {
+      clearTimeout(timer)
+      reject(err)
+    })
+    child.on('close', code => {
+      clearTimeout(timer)
+      if (code !== 0) return reject(new Error(`Ollama exited ${code}: ${stderr || stdout}`))
+      resolve(stdout.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '').trim())
+    })
+  })
 }
 
 function runOpenClawAgent ({ message, timeout = 90000, sessionId = 'keet-neo' }) {
@@ -60,6 +96,7 @@ export async function runBridge ({ interval = 3000, dryRun = false, once = false
   const core = await openKeetCore({ swarming: true })
   const statePath = path.resolve(stateFile)
   const state = loadState(statePath)
+  state.modelMode = normalizeModelMode(state.modelMode)
   const processed = new Set(state.processed || [])
   let roomId = null
   let title = '(unknown)'
@@ -94,6 +131,27 @@ export async function runBridge ({ interval = 3000, dryRun = false, once = false
     }
 
     console.error(JSON.stringify({ type: 'inbound', sender, text }))
+    const command = parseBridgeCommand(text)
+    if (command) {
+      let reply
+      if (command.type === 'model') {
+        state.modelMode = command.mode
+        reply = command.mode === 'local'
+          ? 'Lokaler Modus aktiv. Ich antworte jetzt mit Qwen 3B. Für schwere Sachen: „online“ schreiben.'
+          : 'Online-Modus aktiv. Ich nutze wieder das starke Modell. Für privat/schnell: „lokal“ schreiben.'
+      } else {
+        reply = state.modelMode === 'local'
+          ? 'Aktueller Modus: lokal / Qwen 3B.'
+          : 'Aktueller Modus: online / starkes Modell.'
+      }
+      await send(reply)
+      processed.add(key)
+      state.processed = [...processed].slice(-500)
+      saveState(statePath, state)
+      console.error(JSON.stringify({ type: 'command', command, modelMode: state.modelMode }))
+      return
+    }
+
     const prompt = `Nachricht von Neo über Keet:\n\n${text}\n\nAntworte kurz, praktisch und auf Deutsch als die Matrix. Keine internen Details erwähnen.`
     if (dryRun) {
       processed.add(key)
@@ -102,7 +160,9 @@ export async function runBridge ({ interval = 3000, dryRun = false, once = false
       console.error(JSON.stringify({ type: 'dry-run', text: `[dry-run] Empfangen: ${text}` }))
       return
     }
-    const reply = await runOpenClawAgent({ message: prompt })
+    const reply = state.modelMode === 'local'
+      ? await runLocalOllama({ message: prompt })
+      : await runOpenClawAgent({ message: prompt })
     if (reply) {
       await send(reply)
       processed.add(key)

@@ -134,7 +134,8 @@ A safe bridge must:
 - forward only explicitly approved chat(s),
 - fail closed when the target chat is ambiguous,
 - ignore its own/local echo messages unless debugging requires them,
-- persist enough state to avoid duplicate replies,
+- persist enough state to avoid duplicate replies and the selected model mode,
+- support explicit model switching commands such as `lokal`, `online`, and `modell status`,
 - avoid logging private message contents or secrets,
 - stop or provide a stop command when the task is complete.
 
