@@ -2,6 +2,8 @@ node_modules/
 .env
 *.log
 .keet-bridge-state.json
+openclaw-gateway-watchdog.log
+keet-bridge.log
 .cache/
 /tmp/
 .DS_Store

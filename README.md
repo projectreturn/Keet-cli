@@ -86,3 +86,21 @@ The daemon keeps one Keet core sidecar open and accepts commands:
 ```
 
 This avoids the live-storage lock conflict between separate `watch` and `send` processes. In interactive TTY mode it also polls for incoming messages.
+
+### Bridge supervisor
+
+For a non-systemd environment, run the bridge under the lightweight supervisor:
+
+```bash
+scripts/keet-bridge-supervisor.sh
+```
+
+It restarts `node src/cli.js bridge` if the process exits and writes `keet-bridge.log`.
+
+If the OpenClaw Gateway is required by the surrounding host/session, use the separate watchdog:
+
+```bash
+scripts/openclaw-gateway-watchdog.sh
+```
+
+This is intentionally separate from the Keet bridge because the bridge itself uses `openclaw agent --local`.
