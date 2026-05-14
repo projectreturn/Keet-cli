@@ -104,3 +104,18 @@ scripts/openclaw-gateway-watchdog.sh
 ```
 
 This is intentionally separate from the Keet bridge because the bridge itself uses `openclaw agent --local`.
+
+### Container restart/autostart
+
+This container does not run systemd as PID 1. To survive a Docker restart, make Docker start the repo entrypoint as the container command:
+
+```bash
+/root/.openclaw/workspace/keet-cli/scripts/container-entrypoint.sh
+```
+
+The entrypoint starts:
+
+- OpenClaw Gateway watchdog
+- Keet ↔ OpenClaw bridge supervisor
+
+and keeps PID 1 alive while streaming logs to `docker logs`.
