@@ -60,3 +60,24 @@ The client exposes useful high-level methods including:
 Likely clean path: start or attach to the same core worker RPC transport, then use official client view APIs. Missing piece: desktop worker transport/boot wrapper, bundled/minified inside the Electron/Pear app.
 
 For now this repo remains read-only and inspects local files only. Next milestone: a `core-probe`/`core-readonly` command that loads bundled app modules with the correct module path and attempts a read-only/offline boot using Keet's own APIs.
+
+## Working CLI core path
+
+`keet-cli` can now launch the bundled worker:
+
+```text
+resources/app/.webpack/main/workers/core/index.mjs
+```
+
+It wraps the sidecar IPC with `framed-stream`, creates a `tiny-buffer-rpc` instance, then uses `@holepunchto/keet-core/rpc/client`.
+
+Confirmed working against live storage while Keet Desktop is stopped:
+
+- `core.getVersion`
+- `core.getIdentity`
+- `core.getRecentRooms`
+- `core.getRoomInfo`
+- `core.getChatMessages`
+- `core.addChatMessage`
+
+The GUI and CLI cannot run against the same profile simultaneously because live storage is locked. Copying storage also fails intentionally via `device-file` (`Invalid device file, was moved unsafely`).

@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import { inspectStorage } from './level-scan.js'
 import { probeCore } from './core-probe.js'
+import { probeSidecar } from './sidecar-probe.js'
+import { listRooms, readMessages, sendMessage } from './keet-commands.js'
 
 const args = process.argv.slice(2)
 const cmd = args[0] || 'help'
@@ -12,6 +14,10 @@ Usage:
   keet-cli help
   keet-cli inspect [--json]
   keet-cli core-probe [--json]
+  keet-cli sidecar-probe [--json] [--live]
+  keet-cli rooms [--json]
+  keet-cli messages [--json] [--limit N] [--room ROOM_ID]
+  keet-cli send [--room ROOM_ID] TEXT
 
 Environment:
   KEET_APP_STORAGE   default: ~/.config/Keet/app-storage
@@ -31,6 +37,45 @@ if (cmd === 'help' || cmd === '--help' || cmd === '-h') {
     console.log('interesting client methods:')
     for (const m of result.interestingClientMethods) console.log(`- ${m}`)
   }
+} else if (cmd === 'sidecar-probe') {
+  const result = await probeSidecar({ live: args.includes('--live') })
+  if (args.includes('--json')) console.log(JSON.stringify(result, null, 2))
+  else {
+    console.log(`worker: ${result.worker}`)
+    console.log(`storage: ${result.runStorage}${result.live ? ' (live)' : ' (copy)'}`)
+    for (const line of result.stdout.slice(-8)) console.log(`stdout: ${line}`)
+    for (const line of result.stderr.slice(-8)) console.log(`stderr: ${line}`)
+    for (const r of result.results) {
+      if (r.ok) console.log(`${r.label}: ok ${JSON.stringify(r.value)?.slice(0, 500)}`)
+      else console.log(`${r.label}: ${r.timeout ? 'timeout' : 'error'} ${r.error?.message || ''}`)
+    }
+  }
+} else if (cmd === 'rooms') {
+  const result = await listRooms()
+  if (args.includes('--json')) console.log(JSON.stringify(result, null, 2))
+  else for (const r of result) console.log(`${r.roomId}  ${r.title}  messages=${r.chatLength}  last=${r.lastText}`)
+} else if (cmd === 'messages') {
+  const limitIndex = args.indexOf('--limit')
+  const roomIndex = args.indexOf('--room')
+  const result = await readMessages({
+    limit: limitIndex >= 0 ? Number(args[limitIndex + 1]) : 20,
+    roomId: roomIndex >= 0 ? args[roomIndex + 1] : null
+  })
+  if (args.includes('--json')) console.log(JSON.stringify(result, null, 2))
+  else {
+    console.log(`# ${result.title} (${result.roomId})`)
+    for (const m of result.messages.slice().reverse()) console.log(`${new Date(m.timestamp).toISOString()} ${m.sender}: ${m.text}`)
+  }
+} else if (cmd === 'send') {
+  const roomIndex = args.indexOf('--room')
+  const roomId = roomIndex >= 0 ? args[roomIndex + 1] : null
+  const textArgs = args.slice(1).filter((v, i, arr) => {
+    if (v === '--room') return false
+    if (arr[i - 1] === '--room') return false
+    return true
+  })
+  const result = await sendMessage({ roomId, text: textArgs.join(' ') })
+  console.log(`sent to ${result.title}: ${result.text}`)
 } else if (cmd === 'inspect') {
   const result = inspectStorage()
   if (args.includes('--json')) console.log(JSON.stringify(result, null, 2))

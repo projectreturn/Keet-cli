@@ -47,3 +47,15 @@ Override with:
 ```bash
 KEET_APP_STORAGE=/path/to/app-storage node src/cli.js inspect
 ```
+
+## Current CLI commands
+
+```bash
+node src/cli.js rooms
+node src/cli.js messages --limit 10
+node src/cli.js send 'hello from keet-cli'
+```
+
+These commands launch Keet's bundled core worker via `bare-sidecar` and speak to it through Keet's RPC client.
+
+Current limitation: Keet Desktop and `keet-cli` cannot use the same live storage at the same time because Keet protects the database with a device-file/FD lock. Stop the GUI before using the CLI, or later run a dedicated CLI profile/session strategy.
