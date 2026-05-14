@@ -87,3 +87,9 @@ The GUI and CLI cannot run against the same profile simultaneously because live 
 The first `watch` implementation works as a polling loop over `core.getChatMessages`. It keeps the core sidecar open, so it owns the storage lock. A second `keet-cli send` process cannot run concurrently because it cannot acquire Keet's storage lock.
 
 Next design: one long-lived CLI daemon or REPL owns the sidecar and exposes commands/events, instead of spawning one sidecar per command.
+
+## Daemon/REPL
+
+A first daemon mode now keeps a single core sidecar open and multiplexes commands in one process. This is the preferred direction because Keet live storage permits only one holder at a time.
+
+For non-TTY scripted input, polling is disabled so tests can run deterministically. For interactive TTY input, polling is enabled and emits incoming messages as JSON lines.

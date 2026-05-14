@@ -4,6 +4,7 @@ import { probeCore } from './core-probe.js'
 import { probeSidecar } from './sidecar-probe.js'
 import { listRooms, readMessages, sendMessage } from './keet-commands.js'
 import { watchMessages } from './watch.js'
+import { runDaemon } from './daemon.js'
 
 const args = process.argv.slice(2)
 const cmd = args[0] || 'help'
@@ -20,6 +21,7 @@ Usage:
   keet-cli messages [--json] [--limit N] [--room ROOM_ID]
   keet-cli send [--room ROOM_ID] TEXT
   keet-cli watch [--room ROOM_ID] [--interval MS] [--include-local]
+  keet-cli daemon [--interval MS] [--include-local]
 
 Environment:
   KEET_APP_STORAGE   default: ~/.config/Keet/app-storage
@@ -91,6 +93,12 @@ if (cmd === 'help' || cmd === '--help' || cmd === '-h') {
     onMessage (message, room) {
       console.log(JSON.stringify({ room, message }))
     }
+  })
+} else if (cmd === 'daemon') {
+  const intervalIndex = args.indexOf('--interval')
+  await runDaemon({
+    interval: intervalIndex >= 0 ? Number(args[intervalIndex + 1]) : 3000,
+    includeLocal: args.includes('--include-local')
   })
 } else if (cmd === 'inspect') {
   const result = inspectStorage()

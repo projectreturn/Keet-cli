@@ -69,3 +69,20 @@ node src/cli.js watch --interval 2000
 `watch` polls the latest messages and prints new messages as JSON lines. It intentionally ignores local/self messages unless `--include-local` is used.
 
 Current lock limitation: only one `keet-cli` process can use the live Keet storage at a time. That means `watch` and a separate `send` command cannot run concurrently yet. The next architecture step is a single long-running CLI daemon/REPL that owns the Keet core sidecar and multiplexes `watch` + `send` in one process.
+
+### Daemon / REPL mode
+
+```bash
+node src/cli.js daemon
+```
+
+The daemon keeps one Keet core sidecar open and accepts commands:
+
+```text
+/messages 10
+/send hello from one long-running process
+/rooms
+/quit
+```
+
+This avoids the live-storage lock conflict between separate `watch` and `send` processes. In interactive TTY mode it also polls for incoming messages.
