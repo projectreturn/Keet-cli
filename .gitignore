@@ -9,3 +9,5 @@ keet-bridge.log
 .DS_Store
 # Never commit live Keet profile data
 .keet-data/
+
+dist/

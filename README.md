@@ -134,17 +134,13 @@ This checks OpenClaw/Codex context and quota windows so long-running work can pa
 
 ## OpenClaw / ClawHub skill
 
-A ready-to-install OpenClaw skill package is included at:
-
-```text
-dist/keet-cli.skill
-```
-
-The source skill lives in:
+The ClawHub skill source lives in:
 
 ```text
 skills/keet-cli/SKILL.md
 ```
+
+Upload/use the source skill file for ClawHub. Packaged `.skill` files are generated locally only when needed.
 
 ## Release
 
