@@ -1,0 +1,19 @@
+{
+  "name": "keet-cli",
+  "version": "0.1.0",
+  "description": "Experimental terminal tooling for Keet Messenger profiles and chats.",
+  "type": "module",
+  "bin": {
+    "keet-cli": "./src/cli.js"
+  },
+  "scripts": {
+    "check:usage": "./oc-usage-check.sh",
+    "start": "node ./src/cli.js",
+    "lint": "node --check ./src/*.js"
+  },
+  "keywords": ["keet", "holepunch", "cli", "tui", "p2p"],
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=20"
+  }
+}
