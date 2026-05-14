@@ -5,6 +5,7 @@ import { probeSidecar } from './sidecar-probe.js'
 import { listRooms, readMessages, sendMessage } from './keet-commands.js'
 import { watchMessages } from './watch.js'
 import { runDaemon } from './daemon.js'
+import { runBridge } from './bridge.js'
 
 const args = process.argv.slice(2)
 const cmd = args[0] || 'help'
@@ -22,6 +23,7 @@ Usage:
   keet-cli send [--room ROOM_ID] TEXT
   keet-cli watch [--room ROOM_ID] [--interval MS] [--include-local]
   keet-cli daemon [--interval MS] [--include-local]
+  keet-cli bridge [--interval MS] [--dry-run] [--once] [--replay] [--state FILE]
 
 Environment:
   KEET_APP_STORAGE   default: ~/.config/Keet/app-storage
@@ -99,6 +101,16 @@ if (cmd === 'help' || cmd === '--help' || cmd === '-h') {
   await runDaemon({
     interval: intervalIndex >= 0 ? Number(args[intervalIndex + 1]) : 3000,
     includeLocal: args.includes('--include-local')
+  })
+} else if (cmd === 'bridge') {
+  const intervalIndex = args.indexOf('--interval')
+  const stateIndex = args.indexOf('--state')
+  await runBridge({
+    interval: intervalIndex >= 0 ? Number(args[intervalIndex + 1]) : 3000,
+    dryRun: args.includes('--dry-run'),
+    once: args.includes('--once'),
+    replay: args.includes('--replay'),
+    stateFile: stateIndex >= 0 ? args[stateIndex + 1] : '.keet-bridge-state.json'
   })
 } else if (cmd === 'inspect') {
   const result = inspectStorage()

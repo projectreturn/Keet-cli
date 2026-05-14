@@ -1,6 +1,7 @@
 node_modules/
 .env
 *.log
+.keet-bridge-state.json
 .cache/
 /tmp/
 .DS_Store
