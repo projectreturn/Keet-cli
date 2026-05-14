@@ -56,7 +56,7 @@ function runOpenClawAgent ({ message, timeout = 90000, sessionId = 'keet-neo' })
   })
 }
 
-export async function runBridge ({ interval = 3000, dryRun = false, once = false, replay = false, stateFile = '.keet-bridge-state.json', allowedSender = 'Neo' } = {}) {
+export async function runBridge ({ interval = 3000, dryRun = false, once = false, replay = false, stateFile = '.keet-bridge-state.json', allowedSender = 'PR' } = {}) {
   const core = await openKeetCore({ swarming: true })
   const statePath = path.resolve(stateFile)
   const state = loadState(statePath)
