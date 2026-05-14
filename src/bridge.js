@@ -3,6 +3,8 @@ import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { callWithTimeout, openKeetCore, senderOfMessage, textOfMessage } from './keet-core-session.js'
 
+const AUDIO_DIR = path.resolve('keet-audio')
+
 function sleep (ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
@@ -23,6 +25,76 @@ function loadState (file) {
 function saveState (file, state) {
   ensureDir(file)
   fs.writeFileSync(file, JSON.stringify({ ...state, modelMode: state.modelMode || 'online', processed: state.processed.slice(-500) }, null, 2))
+}
+
+function safeName (name) {
+  return String(name || 'audio').replace(/[^a-zA-Z0-9._-]+/g, '_').slice(0, 120)
+}
+
+function audioFilesOfMessage (message) {
+  const files = message.files || message.message?.files || []
+  return files.filter(file => String(file.metadata?.mimetype || '').startsWith('audio/'))
+}
+
+function runCommand ({ cmd, args, timeout = 180000 }) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] })
+    let stdout = ''
+    let stderr = ''
+    const timer = setTimeout(() => {
+      child.kill('SIGTERM')
+      reject(new Error(`${cmd} timed out`))
+    }, timeout)
+    child.stdout.on('data', d => { stdout += String(d) })
+    child.stderr.on('data', d => { stderr += String(d) })
+    child.on('error', err => {
+      clearTimeout(timer)
+      reject(err)
+    })
+    child.on('close', code => {
+      clearTimeout(timer)
+      if (code !== 0) return reject(new Error(`${cmd} exited ${code}: ${stderr || stdout}`))
+      resolve({ stdout, stderr })
+    })
+  })
+}
+
+async function downloadAudioFile (file, key) {
+  const link = file.entry?.httpLink
+  if (!link) throw new Error('Audio file has no httpLink')
+  fs.mkdirSync(AUDIO_DIR, { recursive: true })
+  const audioPath = path.join(AUDIO_DIR, `${Date.now()}-${safeName(file.metadata?.name || `${key}.m4a`)}`)
+  const response = await fetch(link)
+  if (!response.ok) throw new Error(`Audio download failed: HTTP ${response.status}`)
+  fs.writeFileSync(audioPath, Buffer.from(await response.arrayBuffer()))
+  return audioPath
+}
+
+async function transcribeAudioFile (audioPath) {
+  const outDir = path.join(AUDIO_DIR, 'transcripts')
+  fs.mkdirSync(outDir, { recursive: true })
+  await runCommand({
+    cmd: 'whisper',
+    args: [audioPath, '--model', process.env.WHISPER_MODEL || 'tiny', '--language', 'de', '--output_dir', outDir, '--output_format', 'txt'],
+    timeout: Number(process.env.WHISPER_TIMEOUT_MS || 300000)
+  })
+  const transcriptPath = path.join(outDir, `${path.basename(audioPath, path.extname(audioPath))}.txt`)
+  return fs.readFileSync(transcriptPath, 'utf8').trim()
+}
+
+async function transcribeAudioFiles (files, key) {
+  const transcripts = []
+  for (const [index, file] of files.entries()) {
+    const audioPath = await downloadAudioFile(file, `${key}-${index}`)
+    const transcript = await transcribeAudioFile(audioPath)
+    transcripts.push({
+      name: file.metadata?.name || path.basename(audioPath),
+      mimetype: file.metadata?.mimetype || 'audio',
+      path: audioPath,
+      transcript
+    })
+  }
+  return transcripts
 }
 
 function normalizeModelMode (value) {
@@ -120,8 +192,9 @@ export async function runBridge ({ interval = 3000, dryRun = false, once = false
     if (processed.has(key)) return
 
     const sender = senderOfMessage(m)
-    const text = textOfMessage(m).trim()
-    if (!text || m.member?.local) return
+    let text = textOfMessage(m).trim()
+    const audioFiles = audioFilesOfMessage(m)
+    if ((!text && !audioFiles.length) || m.member?.local) return
     if (allowedSender && sender.toLowerCase() !== allowedSender.toLowerCase()) {
       processed.add(key)
       state.processed = [...processed].slice(-500)
@@ -130,7 +203,14 @@ export async function runBridge ({ interval = 3000, dryRun = false, once = false
       return
     }
 
-    console.error(JSON.stringify({ type: 'inbound', sender, text }))
+    let audioTranscripts = []
+    if (audioFiles.length) {
+      audioTranscripts = await transcribeAudioFiles(audioFiles, key.replace(/[^a-zA-Z0-9._-]+/g, '_'))
+      const transcriptText = audioTranscripts.map((a, i) => `[Audio ${i + 1}: ${a.name}]\n${a.transcript}`).join('\n\n')
+      text = text ? `${text}\n\n${transcriptText}` : transcriptText
+    }
+
+    console.error(JSON.stringify({ type: 'inbound', sender, text, audio: audioTranscripts.map(a => ({ name: a.name, mimetype: a.mimetype, path: a.path })) }))
     const command = parseBridgeCommand(text)
     if (command) {
       let reply
@@ -152,7 +232,7 @@ export async function runBridge ({ interval = 3000, dryRun = false, once = false
       return
     }
 
-    const prompt = `Nachricht von Neo über Keet:\n\n${text}\n\nAntworte kurz, praktisch und auf Deutsch als die Matrix. Keine internen Details erwähnen.`
+    const prompt = `Nachricht von Neo über Keet${audioTranscripts.length ? ' (Audio wurde lokal transkribiert)' : ''}:\n\n${text}\n\nAntworte kurz, praktisch und auf Deutsch als die Matrix. Keine internen Details erwähnen.`
     if (dryRun) {
       processed.add(key)
       state.processed = [...processed].slice(-500)

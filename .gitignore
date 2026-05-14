@@ -4,6 +4,10 @@ node_modules/
 .keet-bridge-state.json
 openclaw-gateway-watchdog.log
 keet-bridge.log
+last-messages-raw.json
+keet-audio/
+whisper-test/
+test-audio.m4a
 .cache/
 /tmp/
 .DS_Store
