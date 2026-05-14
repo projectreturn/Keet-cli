@@ -3,6 +3,7 @@ import { inspectStorage } from './level-scan.js'
 import { probeCore } from './core-probe.js'
 import { probeSidecar } from './sidecar-probe.js'
 import { listRooms, readMessages, sendMessage } from './keet-commands.js'
+import { watchMessages } from './watch.js'
 
 const args = process.argv.slice(2)
 const cmd = args[0] || 'help'
@@ -18,6 +19,7 @@ Usage:
   keet-cli rooms [--json]
   keet-cli messages [--json] [--limit N] [--room ROOM_ID]
   keet-cli send [--room ROOM_ID] TEXT
+  keet-cli watch [--room ROOM_ID] [--interval MS] [--include-local]
 
 Environment:
   KEET_APP_STORAGE   default: ~/.config/Keet/app-storage
@@ -76,6 +78,20 @@ if (cmd === 'help' || cmd === '--help' || cmd === '-h') {
   })
   const result = await sendMessage({ roomId, text: textArgs.join(' ') })
   console.log(`sent to ${result.title}: ${result.text}`)
+} else if (cmd === 'watch') {
+  const roomIndex = args.indexOf('--room')
+  const intervalIndex = args.indexOf('--interval')
+  const roomId = roomIndex >= 0 ? args[roomIndex + 1] : null
+  const interval = intervalIndex >= 0 ? Number(args[intervalIndex + 1]) : 5000
+  console.error(`watching Keet${roomId ? ` room ${roomId}` : ''} every ${interval}ms`)
+  await watchMessages({
+    roomId,
+    interval,
+    includeLocal: args.includes('--include-local'),
+    onMessage (message, room) {
+      console.log(JSON.stringify({ room, message }))
+    }
+  })
 } else if (cmd === 'inspect') {
   const result = inspectStorage()
   if (args.includes('--json')) console.log(JSON.stringify(result, null, 2))

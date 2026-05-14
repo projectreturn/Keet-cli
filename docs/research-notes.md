@@ -81,3 +81,9 @@ Confirmed working against live storage while Keet Desktop is stopped:
 - `core.addChatMessage`
 
 The GUI and CLI cannot run against the same profile simultaneously because live storage is locked. Copying storage also fails intentionally via `device-file` (`Invalid device file, was moved unsafely`).
+
+## Watch mode limitation
+
+The first `watch` implementation works as a polling loop over `core.getChatMessages`. It keeps the core sidecar open, so it owns the storage lock. A second `keet-cli send` process cannot run concurrently because it cannot acquire Keet's storage lock.
+
+Next design: one long-lived CLI daemon or REPL owns the sidecar and exposes commands/events, instead of spawning one sidecar per command.

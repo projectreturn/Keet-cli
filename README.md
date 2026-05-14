@@ -59,3 +59,13 @@ node src/cli.js send 'hello from keet-cli'
 These commands launch Keet's bundled core worker via `bare-sidecar` and speak to it through Keet's RPC client.
 
 Current limitation: Keet Desktop and `keet-cli` cannot use the same live storage at the same time because Keet protects the database with a device-file/FD lock. Stop the GUI before using the CLI, or later run a dedicated CLI profile/session strategy.
+
+### Watch mode
+
+```bash
+node src/cli.js watch --interval 2000
+```
+
+`watch` polls the latest messages and prints new messages as JSON lines. It intentionally ignores local/self messages unless `--include-local` is used.
+
+Current lock limitation: only one `keet-cli` process can use the live Keet storage at a time. That means `watch` and a separate `send` command cannot run concurrently yet. The next architecture step is a single long-running CLI daemon/REPL that owns the Keet core sidecar and multiplexes `watch` + `send` in one process.
