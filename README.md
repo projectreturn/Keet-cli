@@ -132,6 +132,20 @@ and keeps PID 1 alive while streaming logs to `docker logs`.
 
 This checks OpenClaw/Codex context and quota windows so long-running work can pause before hitting limits.
 
+## OpenClaw / ClawHub skill
+
+A ready-to-install OpenClaw skill package is included at:
+
+```text
+dist/keet-cli.skill
+```
+
+The source skill lives in:
+
+```text
+skills/keet-cli/SKILL.md
+```
+
 ## Release
 
 Current release: `v0.1.0`.
