@@ -2,7 +2,7 @@
 
 Terminal tooling for Keet Messenger profiles, chats, and OpenClaw bridge usage.
 
-`keet-cli` is currently a practical v0.1.0 prototype: it can inspect rooms/messages, send messages, run a long-lived daemon, and operate a Keet ↔ OpenClaw bridge for one configured direct chat.
+`keet-cli` is currently a practical v0.2.0 prototype: it can inspect rooms/messages, send messages, run a long-lived daemon, use a basic TUI, and operate optional Keet ↔ OpenClaw bridge workflows.
 
 ## Current status
 
@@ -178,4 +178,4 @@ Upload/use the source skill file for ClawHub. Packaged `.skill` files are genera
 
 ## Release
 
-Current release: `v0.1.0`.
+Current release: `v0.2.0`.
