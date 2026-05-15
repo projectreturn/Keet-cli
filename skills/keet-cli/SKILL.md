@@ -51,6 +51,7 @@ node src/cli.js --help
 node src/cli.js inspect
 node src/cli.js rooms
 node src/cli.js messages --limit 10
+node src/cli.js tui
 ```
 
 Override Keet storage only when the user provides or confirms the path:
@@ -89,6 +90,16 @@ If commands fail due to locking:
 1. Check whether Keet Desktop or another `keet-cli` process is already using the profile.
 2. Prefer one explicitly approved long-running owner process via `daemon` or `bridge` instead of many separate commands.
 3. Do not kill user processes unless explicitly approved.
+
+## TUI mode
+
+Use TUI mode for interactive local inspection only after confirming that no other live Keet owner process is using the same storage:
+
+```bash
+node src/cli.js tui
+```
+
+The TUI can list rooms, select a room, view recent messages, and send messages. Sending is state-changing: confirm the target chat and exact message first.
 
 ## Daemon / REPL mode
 
@@ -137,6 +148,7 @@ A safe bridge must:
 - fail closed when the target chat is ambiguous,
 - ignore its own/local echo messages unless debugging requires them,
 - persist enough state to avoid duplicate replies and the selected model mode,
+- handle Keet audio messages locally when configured: download only from Keet's local file link, transcribe with local Whisper, and forward the transcript instead of raw audio,
 - support explicit model switching commands such as `lokal`, `online`, and `modell status`,
 - avoid logging private message contents or secrets,
 - stop or provide a stop command when the task is complete.
