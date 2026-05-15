@@ -5,7 +5,9 @@ export TZ=Europe/Berlin
 ROOT="${KEET_CLI_ROOT:-/openclaw/workspace/keet-cli}"
 LOGDIR="${KEET_NIGHTLY_LOG_DIR:-/openclaw/workspace/logs}"
 mkdir -p "$LOGDIR"
-LOG="$LOGDIR/keet-cli-nightly-$(date +%F).log"
+TODAY="$(date +%F)"
+LOG="$LOGDIR/keet-cli-nightly-${TODAY}.log"
+SUMMARY_FILE="${KEET_NIGHTLY_SUMMARY_FILE:-$LOGDIR/keet-cli-nightly-summary-${TODAY}.txt}"
 LOCK="${KEET_NIGHTLY_LOCK:-/tmp/keet-cli-nightly-autowork.lock}"
 HOUR="$(date +%H)"
 HOUR_NUM=$((10#$HOUR))
@@ -38,6 +40,8 @@ Rules:
 - Commit as projectreturn <projectreturn@users.noreply.github.com> and push to main only when changes are clean and tested.
 - If blocked, document blocker and stop.
 
+Do not send or deliver any message to Neo at night. Write a concise German summary to this file path instead: "$SUMMARY_FILE"
+
 End with: changed, commit hash if pushed, tests run, next recommended task.
 PROMPT_EOF
 
@@ -50,6 +54,8 @@ trap cleanup EXIT
   git config user.name "projectreturn"
   git config user.email "projectreturn@users.noreply.github.com"
   echo "[$(date -Is)] nightly autowork start"
-  openclaw agent --local --session-id keet-cli-nightly --message "$(cat "$PROMPT_FILE")" --timeout 21000 || true
-  echo "[$(date -Is)] nightly autowork end"
+  export KEET_NIGHTLY_SUMMARY_FILE="$SUMMARY_FILE"
+  openclaw agent --local --session-id keet-cli-nightly --message "$(cat "$PROMPT_FILE")" --timeout 21000 > "$SUMMARY_FILE.raw" 2>&1 || true
+  cp "$SUMMARY_FILE.raw" "$SUMMARY_FILE" 2>/dev/null || true
+  echo "[$(date -Is)] nightly autowork end; summary=$SUMMARY_FILE"
 ) 9>"$LOCK" >> "$LOG" 2>&1
