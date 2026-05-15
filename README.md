@@ -12,9 +12,10 @@ Terminal tooling for Keet Messenger profiles, chats, and OpenClaw bridge usage.
 - ✅ Daemon / REPL mode to avoid storage lock conflicts
 - ✅ Watch mode for incoming messages
 - ✅ Keet ↔ OpenClaw bridge prototype
+- ✅ Safe multi-room bridge routing via explicit allowlist
+- ✅ Invite/membership event reporting without auto-join
 - ✅ Lightweight supervisor and container entrypoint helpers
-- 🚧 Multi-chat routing and invite handling are intentionally not automated yet
-- 🚧 Real TUI is not implemented yet
+- ✅ Basic terminal TUI for room selection, message viewing, and sending
 
 ## Safety
 
@@ -49,6 +50,7 @@ node src/cli.js inspect
 node src/cli.js rooms
 node src/cli.js messages --limit 10
 node src/cli.js send 'hello from keet-cli'
+node src/cli.js tui
 ```
 
 These commands launch Keet's bundled core worker via `bare-sidecar` and speak to it through Keet's RPC client.
@@ -60,6 +62,14 @@ node src/cli.js watch --interval 2000
 ```
 
 `watch` polls the latest messages and prints new messages as JSON lines. It intentionally ignores local/self messages unless `--include-local` is used.
+
+### TUI mode
+
+```bash
+node src/cli.js tui
+```
+
+The TUI is dependency-free and intentionally simple: select a room, view recent messages, refresh, and send a message from one terminal screen. It still uses the same Keet storage, so do not run it at the same time as another live `keet-cli` owner unless you know the storage lock implications.
 
 ### Daemon / REPL mode
 
@@ -146,7 +156,7 @@ and keeps PID 1 alive while streaming logs to `docker logs`.
 - Keet Desktop and `keet-cli` cannot safely use the same live storage at the same time.
 - Only one `keet-cli` process should own the live Keet sidecar/storage at once.
 - Bridge routing is intentionally conservative; do not auto-join invites or create chats without explicit approval.
-- This is not a polished public TUI yet.
+- The TUI is functional but intentionally minimal; it is not a full curses-style client yet.
 
 ## Usage guard
 

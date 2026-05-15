@@ -6,6 +6,7 @@ import { listRooms, readMessages, sendMessage } from './keet-commands.js'
 import { watchMessages } from './watch.js'
 import { runDaemon } from './daemon.js'
 import { runBridge } from './bridge.js'
+import { runTui } from './tui.js'
 
 const args = process.argv.slice(2)
 const cmd = args[0] || 'help'
@@ -23,6 +24,7 @@ Usage:
   keet-cli send [--room ROOM_ID] TEXT
   keet-cli watch [--room ROOM_ID] [--interval MS] [--include-local]
   keet-cli daemon [--interval MS] [--include-local]
+  keet-cli tui
   keet-cli bridge [--interval MS] [--dry-run] [--once] [--replay] [--state FILE] [--config FILE]
 
 Environment:
@@ -102,6 +104,8 @@ if (cmd === 'help' || cmd === '--help' || cmd === '-h') {
     interval: intervalIndex >= 0 ? Number(args[intervalIndex + 1]) : 3000,
     includeLocal: args.includes('--include-local')
   })
+} else if (cmd === 'tui') {
+  await runTui()
 } else if (cmd === 'bridge') {
   const intervalIndex = args.indexOf('--interval')
   const stateIndex = args.indexOf('--state')
