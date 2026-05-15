@@ -131,7 +131,9 @@ Use supervisor/container modes only after the user confirms a persistent process
 
 A safe bridge must:
 
-- forward only explicitly approved chat(s),
+- keep multi-room routing disabled by default,
+- forward only explicitly approved chat(s) from a config allowlist,
+- report invites/membership events without auto-joining or acting on them,
 - fail closed when the target chat is ambiguous,
 - ignore its own/local echo messages unless debugging requires them,
 - persist enough state to avoid duplicate replies and the selected model mode,

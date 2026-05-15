@@ -1,0 +1,6 @@
+{
+  "multiRoom": false,
+  "allowedRooms": [],
+  "allowedSenders": ["PR"],
+  "reportInvites": true
+}

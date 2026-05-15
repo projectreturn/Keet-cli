@@ -23,7 +23,7 @@ Usage:
   keet-cli send [--room ROOM_ID] TEXT
   keet-cli watch [--room ROOM_ID] [--interval MS] [--include-local]
   keet-cli daemon [--interval MS] [--include-local]
-  keet-cli bridge [--interval MS] [--dry-run] [--once] [--replay] [--state FILE]
+  keet-cli bridge [--interval MS] [--dry-run] [--once] [--replay] [--state FILE] [--config FILE]
 
 Environment:
   KEET_APP_STORAGE   default: ~/.config/Keet/app-storage
@@ -105,12 +105,14 @@ if (cmd === 'help' || cmd === '--help' || cmd === '-h') {
 } else if (cmd === 'bridge') {
   const intervalIndex = args.indexOf('--interval')
   const stateIndex = args.indexOf('--state')
+  const configIndex = args.indexOf('--config')
   await runBridge({
     interval: intervalIndex >= 0 ? Number(args[intervalIndex + 1]) : 3000,
     dryRun: args.includes('--dry-run'),
     once: args.includes('--once'),
     replay: args.includes('--replay'),
-    stateFile: stateIndex >= 0 ? args[stateIndex + 1] : '.keet-bridge-state.json'
+    stateFile: stateIndex >= 0 ? args[stateIndex + 1] : '.keet-bridge-state.json',
+    configFile: configIndex >= 0 ? args[configIndex + 1] : null
   })
 } else if (cmd === 'inspect') {
   const result = inspectStorage()

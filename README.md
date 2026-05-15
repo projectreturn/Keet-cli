@@ -82,9 +82,23 @@ This avoids live-storage lock conflicts between separate `watch` and `send` proc
 
 ```bash
 node src/cli.js bridge
+node src/cli.js bridge --config bridge.config.example.json
 ```
 
 The bridge watches the configured Keet chat, forwards incoming messages to OpenClaw or the configured local Ollama model, and sends the reply back to Keet.
+
+By default, multi-room routing is **off**. Enable it only with an explicit config allowlist:
+
+```json
+{
+  "multiRoom": true,
+  "allowedRooms": ["ROOM_ID_1", "ROOM_ID_2"],
+  "allowedSenders": ["PR"],
+  "reportInvites": true
+}
+```
+
+Invites and membership events are reported only; they are not auto-joined or acted on.
 
 Model switch commands inside the Keet chat:
 

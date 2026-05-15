@@ -5,6 +5,13 @@ import { callWithTimeout, openKeetCore, senderOfMessage, textOfMessage } from '.
 
 const AUDIO_DIR = path.resolve('keet-audio')
 
+const DEFAULT_BRIDGE_CONFIG = {
+  multiRoom: false,
+  allowedRooms: [],
+  allowedSenders: ['PR'],
+  reportInvites: true
+}
+
 function sleep (ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
@@ -27,6 +34,25 @@ function saveState (file, state) {
   fs.writeFileSync(file, JSON.stringify({ ...state, modelMode: state.modelMode || 'online', processed: state.processed.slice(-500) }, null, 2))
 }
 
+function asList (value) {
+  if (Array.isArray(value)) return value.map(v => String(v)).filter(Boolean)
+  if (typeof value === 'string' && value.trim()) return value.split(',').map(v => v.trim()).filter(Boolean)
+  return []
+}
+
+function loadBridgeConfig (file) {
+  const config = { ...DEFAULT_BRIDGE_CONFIG }
+  if (file) {
+    const loaded = JSON.parse(fs.readFileSync(path.resolve(file), 'utf8'))
+    Object.assign(config, loaded)
+  }
+  config.multiRoom = config.multiRoom === true
+  config.allowedRooms = asList(config.allowedRooms)
+  config.allowedSenders = asList(config.allowedSenders)
+  config.reportInvites = config.reportInvites !== false
+  return config
+}
+
 function safeName (name) {
   return String(name || 'audio').replace(/[^a-zA-Z0-9._-]+/g, '_').slice(0, 120)
 }
@@ -34,6 +60,11 @@ function safeName (name) {
 function audioFilesOfMessage (message) {
   const files = message.files || message.message?.files || []
   return files.filter(file => String(file.metadata?.mimetype || '').startsWith('audio/'))
+}
+
+function hasInvitationEvent (message) {
+  const generic = message.message?.generic || {}
+  return Boolean(generic.invitationCreated || generic.memberJoined || generic.memberLeft || generic.memberRemoved)
 }
 
 function runCommand ({ cmd, args, timeout = 180000 }) {
@@ -164,38 +195,47 @@ function runOpenClawAgent ({ message, timeout = 90000, sessionId = 'keet-neo' })
   })
 }
 
-export async function runBridge ({ interval = 3000, dryRun = false, once = false, replay = false, stateFile = '.keet-bridge-state.json', allowedSender = 'PR' } = {}) {
+export async function runBridge ({ interval = 3000, dryRun = false, once = false, replay = false, stateFile = '.keet-bridge-state.json', allowedSender = 'PR', configFile = process.env.KEET_BRIDGE_CONFIG || null } = {}) {
   const core = await openKeetCore({ swarming: true })
+  const config = loadBridgeConfig(configFile)
+  if (!config.allowedSenders.length && allowedSender) config.allowedSenders = [allowedSender]
   const statePath = path.resolve(stateFile)
   const state = loadState(statePath)
   state.modelMode = normalizeModelMode(state.modelMode)
   const processed = new Set(state.processed || [])
-  let roomId = null
-  let title = '(unknown)'
+  let rooms = []
 
-  async function ensureRoom () {
-    if (roomId) return roomId
-    const recent = await callWithTimeout('getRecentRooms', () => core.api.core.getRecentRooms({ limit: 1 }))
-    roomId = recent.rooms?.[0]?.roomId
-    if (!roomId) throw new Error('No room found')
-    const info = await callWithTimeout(`getRoomInfo ${roomId}`, () => core.api.core.getRoomInfo(roomId))
-    title = info?.config?.title || '(untitled)'
-    return roomId
+  async function ensureRooms () {
+    if (rooms.length) return rooms
+    const recentLimit = config.multiRoom ? 50 : 1
+    const recent = await callWithTimeout('getRecentRooms', () => core.api.core.getRecentRooms({ limit: recentLimit }))
+    const candidates = recent.rooms || []
+    const selected = config.multiRoom
+      ? candidates.filter(room => config.allowedRooms.includes(room.roomId))
+      : candidates.slice(0, 1)
+    if (config.multiRoom && !config.allowedRooms.length) throw new Error('Multi-room bridge requires allowedRooms in config')
+    if (!selected.length) throw new Error('No allowed room found')
+    rooms = []
+    for (const room of selected) {
+      const info = await callWithTimeout(`getRoomInfo ${room.roomId}`, () => core.api.core.getRoomInfo(room.roomId))
+      rooms.push({ roomId: room.roomId, title: info?.config?.title || '(untitled)' })
+    }
+    return rooms
   }
 
-  async function send (text) {
+  async function send (roomId, text) {
     await callWithTimeout(`addChatMessage ${roomId}`, () => core.api.core.addChatMessage(roomId, text), 30000)
   }
 
-  async function handleMessage (m) {
-    const key = messageKey(m)
+  async function handleMessage (room, m) {
+    const key = `${room.roomId}:${messageKey(m)}`
     if (processed.has(key)) return
 
     const sender = senderOfMessage(m)
     let text = textOfMessage(m).trim()
     const audioFiles = audioFilesOfMessage(m)
     if ((!text && !audioFiles.length) || m.member?.local) return
-    if (allowedSender && sender.toLowerCase() !== allowedSender.toLowerCase()) {
+    if (config.allowedSenders.length && !config.allowedSenders.some(s => s.toLowerCase() === sender.toLowerCase())) {
       processed.add(key)
       state.processed = [...processed].slice(-500)
       saveState(statePath, state)
@@ -224,7 +264,7 @@ export async function runBridge ({ interval = 3000, dryRun = false, once = false
           ? 'Aktueller Modus: lokal / Qwen 3B.'
           : 'Aktueller Modus: online / starkes Modell.'
       }
-      await send(reply)
+      await send(room.roomId, reply)
       processed.add(key)
       state.processed = [...processed].slice(-500)
       saveState(statePath, state)
@@ -232,7 +272,11 @@ export async function runBridge ({ interval = 3000, dryRun = false, once = false
       return
     }
 
-    const prompt = `Nachricht von Neo über Keet${audioTranscripts.length ? ' (Audio wurde lokal transkribiert)' : ''}:\n\n${text}\n\nAntworte kurz, praktisch und auf Deutsch als die Matrix. Keine internen Details erwähnen.`
+    if (config.reportInvites && hasInvitationEvent(m)) {
+      text = `${text}\n\n[Keet-Systemereignis erkannt: Einladung/Mitgliedschaft. Nicht automatisch handeln.]`.trim()
+    }
+
+    const prompt = `Nachricht von Neo über Keet${config.multiRoom ? ` in ${room.title}` : ''}${audioTranscripts.length ? ' (Audio wurde lokal transkribiert)' : ''}:\n\n${text}\n\nAntworte kurz, praktisch und auf Deutsch als die Matrix. Keine internen Details erwähnen.`
     if (dryRun) {
       processed.add(key)
       state.processed = [...processed].slice(-500)
@@ -244,7 +288,7 @@ export async function runBridge ({ interval = 3000, dryRun = false, once = false
       ? await runLocalOllama({ message: prompt })
       : await runOpenClawAgent({ message: prompt })
     if (reply) {
-      await send(reply)
+      await send(room.roomId, reply)
       processed.add(key)
       state.processed = [...processed].slice(-500)
       saveState(statePath, state)
@@ -253,20 +297,23 @@ export async function runBridge ({ interval = 3000, dryRun = false, once = false
   }
 
   try {
-    await ensureRoom()
-    console.error(`keet-openclaw bridge ready. room=${roomId} title=${title} dryRun=${dryRun} replay=${replay}`)
+    await ensureRooms()
+    console.error(`keet-openclaw bridge ready. rooms=${rooms.map(r => `${r.roomId}:${r.title}`).join(',')} multiRoom=${config.multiRoom} dryRun=${dryRun} replay=${replay}`)
     let primed = false
     for (;;) {
-      const messages = await callWithTimeout(`getChatMessages ${roomId}`, () => core.api.core.getChatMessages(roomId, { reverse: true, limit: 30 }), 30000)
-      if (!primed && !replay) {
-        for (const m of messages || []) processed.add(messageKey(m))
+      for (const room of rooms) {
+        const messages = await callWithTimeout(`getChatMessages ${room.roomId}`, () => core.api.core.getChatMessages(room.roomId, { reverse: true, limit: 30 }), 30000)
+        if (!primed && !replay) {
+          for (const m of messages || []) processed.add(`${room.roomId}:${messageKey(m)}`)
+        } else {
+          for (const m of (messages || []).slice().reverse()) await handleMessage(room, m)
+        }
+      }
+      if (!primed || !replay) {
         state.processed = [...processed].slice(-500)
         saveState(statePath, state)
-        primed = true
-      } else {
-        primed = true
-        for (const m of (messages || []).slice().reverse()) await handleMessage(m)
       }
+      primed = true
       if (once) break
       await sleep(interval)
     }
